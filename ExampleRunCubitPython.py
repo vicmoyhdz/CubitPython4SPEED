@@ -2,7 +2,7 @@ import cubit
 cubit.init(['cubit','-nojournal'])
 cubit.reset()
 
-cubit.cmd('cd \'C:\\Users\\vmh5\\Documents\\CubitPython\'')
+cubit.cmd('cd \'C:\\Users\\vmh5\\Documents\\CubitPython4SPEED\'')
 f="Files\TopoExample.cfg"
 #f="Files\RegmeshExample.cfg"
 #f="Files\TopoSurfaceExample.cfg"

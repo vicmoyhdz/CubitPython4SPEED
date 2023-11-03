@@ -79,57 +79,63 @@ def export_mesh(block_list,filename=None):
         import start
         cfg = start.start_cfg(filename=filename)
 
-    print('exporting SPEED mesh file...')
-    cubit.cmd('compress node hex face')
-    node_list_unsorted = cubit.parse_cubit_list('node', 'in hex in block '+ '  '.join(str(x) for x in block_list))
-    node_list = tuple(sorted(node_list_unsorted))
-    num_nodes = len(node_list)
-    print(' total number of nodes:', str(num_nodes))
-    num_elems = 0
-    for iblock in block_list:
-        num_elems=num_elems + len(cubit.get_block_hexes(iblock))
-
     face_list_unsorted = cubit.get_block_faces(100)
-    face_list = tuple(sorted(face_list_unsorted))
-    num_faces=len(face_list_unsorted)
 
-    print(' total number of elements:', str(num_elems+num_faces))
+    if len(face_list_unsorted)>0:
 
-    if filename:
-        meshfile = open(cfg.output_dir + '\Meshfile.mesh', 'w')
-    else:
-        meshfile = open('Meshfile.mesh', 'w')
-    
-    txt = ('   %i  %i  %i   %i   %i\n') % (num_nodes, num_elems+num_faces, 0, 0, 0)
-    meshfile.write(txt)
+        face_list = tuple(sorted(face_list_unsorted))
+        num_faces=len(face_list_unsorted)
 
-    for node in node_list:
-        x, y, z = cubit.get_nodal_coordinates(node)
-        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (node, x, y, z)
-        meshfile.write(txt)
+        print('exporting SPEED mesh file...')
+        cubit.cmd('compress node hex face')
+        node_list_unsorted = cubit.parse_cubit_list('node', 'in hex in block '+ '  '.join(str(x) for x in block_list))
+        node_list = tuple(sorted(node_list_unsorted))
+        num_nodes = len(node_list)
+        print(' total number of nodes:', str(num_nodes))
+        num_elems = 0
+        for iblock in block_list:
+            num_elems=num_elems + len(cubit.get_block_hexes(iblock))
 
-    idf = 1
+        print(' total number of elements:', str(num_elems+num_faces))
+
+        if filename:
+            meshfile = open(cfg.output_dir + '\Meshfile.mesh', 'w')
+        else:
+            meshfile = open('Meshfile.mesh', 'w')
         
-    for face in face_list:
-        nodesf= cubit.get_connectivity('face', face)
-        txt = str(idf) + '  100  quad  ' + '  '.join(str(x) for x in nodesf)
-        txt = txt + '\n'
+        txt = ('   %i  %i  %i   %i   %i\n') % (num_nodes, num_elems+num_faces, 0, 0, 0)
         meshfile.write(txt)
-        idf=idf+1
-    
-    idh=1
 
-    for block in block_list:
-        hex_list_unsorted = cubit.get_block_hexes(block)
-        hex_list = tuple(sorted(hex_list_unsorted))
-        for hex in hex_list:
-            nodes= cubit.get_connectivity('hex', hex)
-            txt = str(idh) + '  ' + str(block) + '   hex  ' + '  '.join(str(x) for x in nodes)
+        for node in node_list:
+            x, y, z = cubit.get_nodal_coordinates(node)
+            txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (node, x, y, z)
+            meshfile.write(txt)
+
+        idf = 1
+            
+        for face in face_list:
+            nodesf= cubit.get_connectivity('face', face)
+            txt = str(idf) + '  100  quad  ' + '  '.join(str(x) for x in nodesf)
             txt = txt + '\n'
             meshfile.write(txt)
-            idh=idh+1
+            idf=idf+1
+        
+        idh=1
 
-    meshfile.close()
+        for block in block_list:
+            hex_list_unsorted = cubit.get_block_hexes(block)
+            hex_list = tuple(sorted(hex_list_unsorted))
+            for hex in hex_list:
+                nodes= cubit.get_connectivity('hex', hex)
+                txt = str(idh) + '  ' + str(block) + '   hex  ' + '  '.join(str(x) for x in nodes)
+                txt = txt + '\n'
+                meshfile.write(txt)
+                idh=idh+1
+
+        meshfile.close()
+    else:
+        print('Block 100 (ABS) is empty or missing. This block should include the faces of the ABS')
+    
 
 def export_surfacemesh(bl=1,filename=None):
 
