@@ -122,15 +122,23 @@ def export_mesh(block_list,filename=None):
         
         idh=1
 
+        hex_quality = []
         for block in block_list:
             hex_list_unsorted = cubit.get_block_hexes(block)
             hex_list = tuple(sorted(hex_list_unsorted))
+  
             for hex in hex_list:
+                hex_quality.append(cubit.get_quality_value("hex", hex, "scaled jacobian"))
                 nodes= cubit.get_connectivity('hex', hex)
                 txt = str(idh) + '  ' + str(block) + '   hex  ' + '  '.join(str(x) for x in nodes)
                 txt = txt + '\n'
                 meshfile.write(txt)
                 idh=idh+1
+        sj = [x for x in hex_quality if x <= 0.2]
+        sj1 = [x for x in hex_quality if x <= 0.1]
+        print('Minimum scaled jacobian is ', str(min(sj)))
+        if len(sj)>0:  
+            print('Warning: ',str(round(100*len(sj)/len(hex_quality),1)),'% of elements (',str(len(sj)),') have scaled jacobian (sj) <0.2, from which ',str(len(sj1)),' elements have sj<0.1')       
 
         meshfile.close()
     else:
