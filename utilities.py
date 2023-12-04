@@ -136,7 +136,7 @@ def export_mesh(block_list,filename=None):
                 idh=idh+1
         sj = [x for x in hex_quality if x <= 0.2]
         sj1 = [x for x in hex_quality if x <= 0.1]
-        print('Minimum scaled jacobian is ', str(min(sj)))
+        print('Minimum scaled jacobian is ', str(min(hex_quality)))
         if len(sj)>0:  
             print('Warning: ',str(round(100*len(sj)/len(hex_quality),1)),'% of elements (',str(len(sj)),') have scaled jacobian (sj) <0.2, from which ',str(len(sj1)),' elements have sj<0.1')       
 
@@ -214,6 +214,25 @@ def export_LS(block=1,istart=1,filename=None):
 
     LSfile.close()
 
+def DoRotation(xmin,ymin,x1, y1, RotDeg=0):
+    """Generate a meshgrid and rotate it by RotRad radians."""
+    import math
+    import numpy
+    RotRad=math.radians(RotDeg)
+    # Clockwise, 2D rotation matrix
+    RotMatrix = numpy.array([[numpy.cos(RotRad),  -numpy.sin(RotRad), xmin*(1-numpy.cos(RotRad))+ymin*numpy.sin(RotRad)],
+                          [numpy.sin(RotRad), numpy.cos(RotRad), ymin*(1-numpy.cos(RotRad))-xmin*numpy.sin(RotRad)],
+                          [0,0,1]])
+
+    #x, y = numpy.meshgrid(xspan, yspan)
+    z1 = numpy.ones(x1.shape)
+    b=numpy.dstack([x1, y1, z1])
+    a=numpy.einsum('ji, mni -> jmn', RotMatrix, b)
+    #a=numpy.einsum('ijk, mnjk -> imn', RotMatrix, b)
+    
+    x=a[0]
+    y=a[1]
+    return x,y
 
 def load_curves(acis_filename):
     """

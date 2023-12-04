@@ -84,7 +84,8 @@ def get_interpolated_elevation(point, gridpoints, z, k=1):
     gridpoints=numpy.array([[x1,y1],[x2,y2],...)
 
     """
-    dist = numpy.sum((point - gridpoints)**2, axis=1)
+    distraw = numpy.sum((point - gridpoints)**2, axis=1)
+    dist=numpy.where(distraw <= 0, 0.01, distraw)
     zindex = dist.argsort()[:k]
     kmindist = dist[zindex]
     w = 1 / kmindist
@@ -93,10 +94,12 @@ def get_interpolated_elevation(point, gridpoints, z, k=1):
     return zi
 
 
-def create_grid(xmin, xmax, ymin, ymax, xstep, ystep):
+def create_grid(xmin, xmax, ymin, ymax, xstep, ystep,RotDeg):
     """create regular grid with xmin,xmax by xstep and  ymin,ymax by ystep"""
-    x, y = numpy.mgrid[xmin:xmax + xstep / 2.:xstep,
+    from utilities import DoRotation
+    x1, y1 = numpy.mgrid[xmin:xmax + xstep / 2.:xstep,
                        ymin:ymax + ystep / 2.:ystep]  # this includes bounds
+    x,y=DoRotation(xmin,ymin,x1, y1, RotDeg)
     gridpoints = numpy.vstack([x.ravel(), y.ravel()]).T
     return x, y, gridpoints
 
@@ -170,10 +173,10 @@ def process_surfacefiles(ipro, nx, ny, nstep, grdfile, unit, lat_orientation):
     return coordx, coordy, elev
 
 
-def process_irregular_surfacefiles(ipro, nx, ny, xmin, xmax, ymin, ymax,
-                                   xstep, ystep, grdfile):
+def process_sample_grid(ipro, nx, ny, xmin, xmax, ymin, ymax,
+                                   xstep, ystep, grdfile,RotDeg):
     gridpoints, z = read_irregular_surf(grdfile)
-    coordx, coordy, points = create_grid(xmin, xmax, ymin, ymax, xstep, ystep)
+    coordx, coordy, points = create_grid(xmin, xmax, ymin, ymax, xstep, ystep,RotDeg)
 
     elev = numpy.empty([len(points)])
     for i in range(len(points)):
@@ -191,8 +194,10 @@ def read_grid(filename=None,ipro=0):
     #
     numpy = start.start_numpy()
     cfg = start.start_cfg(filename=filename)
+    RotAng = cfg.rot_deg
+    print('Degrees',RotAng)
 
-    # if cfg.irregulargridded_surf==True then cfg.nx and cfg.ny are the
+    # if cfg.sample_grid==True then cfg.nx and cfg.ny are the
     # desired number of point along the axis....
     if cfg.nx and cfg.ny:
         nx = cfg.nx
@@ -215,7 +220,7 @@ def read_grid(filename=None,ipro=0):
         nstep = 1
     #
 
-    if cfg.irregulargridded_surf:
+    if cfg.sample_grid:
         xt, xstep = numpy.linspace(cfg.xmin, cfg.xmax, num=nx, retstep=True)
         yt, ystep = numpy.linspace(cfg.ymin, cfg.ymax, num=ny, retstep=True)
 
@@ -237,10 +242,10 @@ def read_grid(filename=None,ipro=0):
         else:
             grdfilename = cfg.filename[inz - lenFlat]
 
-            if cfg.irregulargridded_surf:
-                coordx, coordy, elev_1 = process_irregular_surfacefiles(
+            if cfg.sample_grid:
+                coordx, coordy, elev_1 = process_sample_grid(
                     ipro, nx, ny, cfg.xmin, cfg.xmax, cfg.ymin, cfg.ymax,
-                    xstep, ystep, grdfilename)
+                    xstep, ystep, grdfilename,RotAng)
             else:
                 coordx, coordy, elev_1 = process_surfacefiles(
                     ipro, nx, ny, nstep, grdfilename, cfg.unit,
@@ -258,10 +263,10 @@ def read_grid(filename=None,ipro=0):
             grdfile = cfg.filename[inz - lenFlat]
                 
            # print('reading ', grdfile)
-            if cfg.irregulargridded_surf:
-                coordx, coordy, elev_1 = process_irregular_surfacefiles(
+            if cfg.sample_grid:
+                coordx, coordy, elev_1 = process_sample_grid(
                     ipro, nx, ny, cfg.xmin, cfg.xmax, cfg.ymin, cfg.ymax,
-                    xstep, ystep, grdfile)
+                    xstep, ystep, grdfile,RotAng)
             else:
                 coordx, coordy, elev_1 = process_surfacefiles(
                     ipro, nx, ny, nstep, grdfile, cfg.unit,

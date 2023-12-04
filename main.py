@@ -1,6 +1,6 @@
 #############################################################################
 # main.py                                                                   #
-# Modified by Victor Hernandez from GEOCUBIT (Emanuele Casarotti)           #                                           #
+# Modified by Victor Hernandez from GEOCUBIT (Emanuele Casarotti)           #
 # Copyright (c) 2008 Istituto Nazionale di Geofisica e Vulcanologia         #
 #                                                                           #
 #############################################################################
@@ -911,8 +911,7 @@ def merging_surface():
         isempty = merging_node_new(tol, clean=True, graphic_debug=False)
         tol = tol + step_tol
         if tol > maxvalue * 1.5:
-            raise MergingError(
-                'tolerance greater than the max length of the edges, \
+            raise MergingError('tolerance greater than the max length of the edges, \
                     please check the mesh')
     # cubit.cmd('del group all')        
     # cubit.cmd('set info on')
@@ -1053,20 +1052,21 @@ def definesurface_blocks(nx_segment,ny_segment,lprevious,filename):
     
     lcurve = cubit.get_relatives("surface", list_sur[0], "curve")
     list_curve_or=list(lcurve)
+
+    from utilities import DoRotation
+    import numpy
         
     for iv in list_curve_or:
         pv = cubit.get_center_point("curve", iv)
-        if xmin_box-tol < pv[0] < xmin_box+tol or xmax_box-tol < pv[0] < xmax_box+tol :
+        x_rotated,y_rotated = DoRotation(xmin_box,ymin_box,numpy.array([pv[0]]), numpy.array([pv[1]]), -1*cfg.rot_deg)
+        if xmin_box-tol < x_rotated < xmin_box+tol or xmax_box-tol < x_rotated < xmax_box+tol :
             pass
-        elif ymin_box-tol < pv[1] < ymin_box+tol or ymax_box-tol < pv[1] < ymax_box+tol :
+        elif ymin_box-tol < y_rotated < ymin_box+tol or ymax_box-tol < y_rotated < ymax_box+tol :
             pass
         else:
                 # command = "block 200 add edge in curve " + str(iv)
                 # cubit.cmd(command)
                 cubit.cmd("group 'lateral' add edge in curve " + str(iv))
-
-
-
 
 
 def define_blocks(nx_segment,ny_segment,lprevious,filename):
@@ -1091,26 +1091,29 @@ def define_blocks(nx_segment,ny_segment,lprevious,filename):
     
     tol=2
     
-    from utilities import get_v_h_list
+    from utilities import get_v_h_list, DoRotation
     surf_or, surf_vertical, list_curve_or, list_curve_vertical, \
         bottom, top = get_v_h_list(list_vol)
+    import numpy
         
     for iv in surf_vertical:
         pv = cubit.get_center_point("surface", iv)
+        x_rotated,y_rotated = DoRotation(xmin_box,ymin_box,numpy.array([pv[0]]), numpy.array([pv[1]]), -1*cfg.rot_deg)
         normal = cubit.get_surface_normal(iv)
-        if xmin_box-tol < pv[0] < xmin_box+tol or xmax_box-tol < pv[0] < xmax_box+tol :
+        normx_rotated,normy_rotated = DoRotation(0,0,numpy.array([normal[0]]), numpy.array([normal[1]]), -1*cfg.rot_deg)
+        if xmin_box-tol < x_rotated < xmin_box+tol or xmax_box-tol < x_rotated < xmax_box+tol :
                 command = "block 100 add face in surface " + str(iv)
                 cubit.cmd(command)
-        elif ymin_box-tol < pv[1] < ymin_box+tol or ymax_box-tol < pv[1] < ymax_box+tol :
+        elif ymin_box-tol < y_rotated < ymin_box+tol or ymax_box-tol < y_rotated < ymax_box+tol :
                 command = "block 100 add face in surface " + str(iv)
                 cubit.cmd(command)
-        elif 0.8 <= normal[0] <= 1.2:
+        elif 0.9 <= normx_rotated <= 1.1:
                 cubit.cmd("group 'intermediatelateral' add face in surface " + str(iv))      
                 cubit.cmd("group 'next_lateral_nodes' add node in surface " + str(iv))
-        elif -1.2 <= normal[0] <= -0.8:
+        elif -1.1 <= normx_rotated <= -0.9:
                 cubit.cmd("group 'intermediatelateral' add face in surface " + str(iv))
                 cubit.cmd("group 'coincident_lateral_nodes' add node in surface " + str(iv))
-        elif 0.8 <= normal[1] <= 1.2:
+        elif 0.9 <= normy_rotated <= 1.1:
                 cubit.cmd("group 'next_lateral' add face in surface " + str(iv))
         else:
                 cubit.cmd("group 'lateral' add face in surface " + str(iv))

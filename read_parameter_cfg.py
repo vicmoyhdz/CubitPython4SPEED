@@ -183,7 +183,8 @@ def readcfg(filename=None, mpiflag=False):
     # if true it creates only the surface not the lofted volumes
     dcfg['debugsurface'] = False
     dcfg['lat_orientation'] = False
-    dcfg['irregulargridded_surf'] = False
+    dcfg['sample_grid'] = False
+    dcfg['rot_deg'] = 0
     dcfg['chktop'] = False
     dcfg['smoothing'] = False
     dcfg['ntripl'] = 0
@@ -285,7 +286,7 @@ def readcfg(filename=None, mpiflag=False):
         except:
             pass
 
-        if dcfg['irregulargridded_surf']:
+        if dcfg['sample_grid']:
             dcfg['xmin'] = dcfg['longitude_min']
             dcfg['ymin'] = dcfg['latitude_min']
             dcfg['xmax'] = dcfg['longitude_max']
