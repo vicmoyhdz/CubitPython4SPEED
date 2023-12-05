@@ -1088,7 +1088,7 @@ def define_blocks(nx_segment,ny_segment,lprevious,filename):
     xmax_box = cfg.xmin+(nx_segment-1)*(cfg.end_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1)
     ymin_box = cfg.ymin+(ny_segment-1)*(cfg.start_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
     ymax_box = cfg.ymin+(ny_segment-1)*(cfg.end_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
-    
+
     tol=2
     
     from utilities import get_v_h_list, DoRotation
@@ -1098,7 +1098,7 @@ def define_blocks(nx_segment,ny_segment,lprevious,filename):
         
     for iv in surf_vertical:
         pv = cubit.get_center_point("surface", iv)
-        x_rotated,y_rotated = DoRotation(xmin_box,ymin_box,numpy.array([pv[0]]), numpy.array([pv[1]]), -1*cfg.rot_deg)
+        x_rotated,y_rotated = DoRotation(cfg.xmin,cfg.ymin,numpy.array([pv[0]]), numpy.array([pv[1]]), -1*cfg.rot_deg)
         normal = cubit.get_surface_normal(iv)
         normx_rotated,normy_rotated = DoRotation(0,0,numpy.array([normal[0]]), numpy.array([normal[1]]), -1*cfg.rot_deg)
         if xmin_box-tol < x_rotated < xmin_box+tol or xmax_box-tol < x_rotated < xmax_box+tol :
