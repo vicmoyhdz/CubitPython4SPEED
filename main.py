@@ -1058,7 +1058,7 @@ def definesurface_blocks(nx_segment,ny_segment,lprevious,filename):
         
     for iv in list_curve_or:
         pv = cubit.get_center_point("curve", iv)
-        x_rotated,y_rotated = DoRotation(xmin_box,ymin_box,numpy.array([pv[0]]), numpy.array([pv[1]]), -1*cfg.rot_deg)
+        x_rotated,y_rotated = DoRotation(cfg.xmin,cfg.ymin,numpy.array([pv[0]]), numpy.array([pv[1]]), -1*cfg.rot_deg)
         if xmin_box-tol < x_rotated < xmin_box+tol or xmax_box-tol < x_rotated < xmax_box+tol :
             pass
         elif ymin_box-tol < y_rotated < ymin_box+tol or ymax_box-tol < y_rotated < ymax_box+tol :
