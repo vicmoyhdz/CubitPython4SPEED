@@ -1085,9 +1085,9 @@ def define_blocks(nx_segment,ny_segment,lprevious,filename):
 
     zmin_box = cfg.depth_bottom
     xmin_box = cfg.xmin+(nx_segment-1)*(cfg.start_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1)
-    xmax_box = cfg.xmin+(nx_segment-1)*(cfg.end_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1)
+    xmax_box = min(cfg.xmin+(nx_segment-1)*(cfg.end_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1),cfg.xmax)
     ymin_box = cfg.ymin+(ny_segment-1)*(cfg.start_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
-    ymax_box = cfg.ymin+(ny_segment-1)*(cfg.end_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
+    ymax_box = min(cfg.ymin+(ny_segment-1)*(cfg.end_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1),cfg.ymax)
 
     tol=2
     
@@ -1182,38 +1182,6 @@ def blockTop():
     command = "block 1 remove hex " + ' '.join(str(x) for x in listTop)
     cubit.cmd(command)
     command = "block " + str(block_list[-1]+1) + " add hex " + ' '.join(str(x) for x in listTop)
-    cubit.cmd(command)
-
-def BlockBoundary(blockabsorbing=100,blockapply=[1]):
-    quads_in_surf = cubit.get_block_faces(blockabsorbing)
-    list_all_hex = cubit.parse_cubit_list('hex', 'in block ' + ' '.join(str(x) for x in blockapply))
-    Nhex = len(list_all_hex)
-    s = set(quads_in_surf)
-    listTop=[]
-    for h in list_all_hex:
-        faces = cubit.get_sub_elements('hex', h, 2)
-        for f in faces:
-            if f in s:
-                    listTop.append(h)
-    for ih in blockapply:
-        command = "block " + str(ih) + " remove hex " + ' '.join(str(x) for x in listTop)
-        cubit.cmd(command)
-    command = "block 8 add hex " + ' '.join(str(x) for x in listTop)
-    cubit.cmd(command)
-
-
-    cubit.cmd('group \'boundaryhex\' add node in hex in block 8')
-    groupb = cubit.get_id_from_name("boundaryhex")
-    nodesb = list(cubit.get_group_nodes(groupb))
-    hexesl=[]
-    for inodes in nodesb:
-            nh = cubit.parse_cubit_list('hex', 'in node ' + str(inodes))
-            hexesadd = list(nh)
-            hexesl.append(hexesadd)
-    for ih in blockapply:
-        command = "block " + str(ih) + " remove hex " + ' '.join(str(x) for x in hexesl)
-        cubit.cmd(command)
-    command = "block 8 add hex " + ' '.join(str(x) for x in hexesl)
     cubit.cmd(command)
 
 def define_top(filename,ltprevious,block):

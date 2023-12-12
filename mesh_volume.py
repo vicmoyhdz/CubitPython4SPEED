@@ -115,7 +115,7 @@ def meshsurface_layercake_regularmap(filename,iproc,lprevious):
     lcurve = cubit.get_relatives("surface", list_sur[0], "curve")
     list_curve_or=list(lcurve)
 
-    ucurve, vcurve = get_uv_curve(list_curve_or)
+    ucurve, vcurve = get_uv_curve(list_curve_or,filename)
     schemepave = False
     #
 
@@ -217,18 +217,21 @@ def mesh_layercake_regularmap(filename,iproc,lprevious):
         command = "surface " + str(k) + " scheme " + cfg.or_mesh_scheme
         cubit.cmd(command)
     #
-    ucurve, vcurve = get_uv_curve(list_curve_or)
+    ucurve, vcurve = get_uv_curve(list_curve_or,filename)
     schemepave = False
     #
-    #print('ucurve',ucurve)
-    #print('vcurve',vcurve)
+    # print('ucurve',ucurve)
+    # print('vcurve',vcurve)
     ucurve_interval = {}
     for k in ucurve:
-        length = cubit.get_curve_length(k)
+        length_r = cubit.get_curve_length(k)
+        length=round(length_r)
         interval = int(round(length / cfg.size))
         ucurve_interval[k] = interval
+    # print('u intervals',ucurve_interval.values())
+    intervalu=min(ucurve_interval.values())   
+    # print(intervalu)
     for k in ucurve:
-        intervalu=min(ucurve_interval.values())
         command = "curve " + str(k) + " interval " + str(intervalu)
         cubit.cmd(command)
         # cubit_error_stop(iproc,command,ner)
@@ -238,11 +241,14 @@ def mesh_layercake_regularmap(filename,iproc,lprevious):
     #
     vcurve_interval = {}
     for k in vcurve:
-        length = cubit.get_curve_length(k)
+        length_r = cubit.get_curve_length(k)
+        length=round(length_r)
         interval = int(round(length / cfg.size))
         vcurve_interval[k] = interval
+    # print('v intervals',vcurve_interval.values())
+    intervalv=min(vcurve_interval.values())  
+    # print(intervalv)  
     for k in vcurve:
-        intervalv=min(vcurve_interval.values())
         command = "curve " + str(k) + " interval " + str(intervalv)
         cubit.cmd(command)
         # cubit_error_stop(iproc,command,ner)
@@ -657,15 +663,20 @@ def refine_surface_curve(curves, ntimes=1, depth=1, block=1, nodes=[], surface=F
         print('error, negative jacobian after the refining')
 
 
-def get_uv_curve(list_curve_or):
+def get_uv_curve(list_curve_or,filename):
     import math
     import numpy as np
+    from utilities import DoRotation
+    import start as start
+    cfg = start.start_cfg(filename)
     klen = {}
     for curve in list_curve_or:
         vertex_list = cubit.get_relatives("curve", curve, "vertex")
-        coord0 = cubit.get_center_point('vertex', vertex_list[0])
-        coord1 = cubit.get_center_point('vertex', vertex_list[1])
-        klen[curve] = np.array(coord1) - np.array(coord0)
+        coord0_rot = cubit.get_center_point('vertex', vertex_list[0])
+        coord1_rot = cubit.get_center_point('vertex', vertex_list[1])
+        coord0x,coord0y = DoRotation(cfg.xmin,cfg.ymin,np.array([coord0_rot[0]]), np.array([coord0_rot[1]]), -1*cfg.rot_deg)
+        coord1x,coord1y = DoRotation(cfg.xmin,cfg.ymin,np.array([coord1_rot[0]]), np.array([coord1_rot[1]]), -1*cfg.rot_deg)
+        klen[curve] = np.array([coord1x,coord1y,coord1_rot[2]]) - np.array([coord0x,coord0y,coord0_rot[2]])
     #
     l0 = list_curve_or[0]
     c0 = klen[l0]
