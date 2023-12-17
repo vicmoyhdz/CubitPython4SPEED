@@ -676,7 +676,7 @@ def get_uv_curve(list_curve_or,filename):
         coord1_rot = cubit.get_center_point('vertex', vertex_list[1])
         coord0x,coord0y = DoRotation(cfg.xmin,cfg.ymin,np.array([coord0_rot[0]]), np.array([coord0_rot[1]]), -1*cfg.rot_deg)
         coord1x,coord1y = DoRotation(cfg.xmin,cfg.ymin,np.array([coord1_rot[0]]), np.array([coord1_rot[1]]), -1*cfg.rot_deg)
-        klen[curve] = np.array([coord1x,coord1y,coord1_rot[2]]) - np.array([coord0x,coord0y,coord0_rot[2]])
+        klen[curve] = np.array([coord1x[0,0],coord1y[0,0],coord1_rot[2]]) - np.array([coord0x[0,0],coord0y[0,0],coord0_rot[2]])
     #
     l0 = list_curve_or[0]
     c0 = klen[l0]
