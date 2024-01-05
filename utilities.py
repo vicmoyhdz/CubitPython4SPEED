@@ -79,6 +79,7 @@ def export_mesh(block_list,filename=None):
         import start
         cfg = start.start_cfg(filename=filename)
 
+    cubit.cmd('compress all')
     face_list_unsorted = cubit.get_block_faces(100)
 
     if len(face_list_unsorted)>0:
@@ -86,8 +87,7 @@ def export_mesh(block_list,filename=None):
         face_list = tuple(sorted(face_list_unsorted))
         num_faces=len(face_list_unsorted)
 
-        print('exporting SPEED mesh file...')
-        cubit.cmd('compress node hex face')
+        print('exporting SPEED mesh file...')  
         #node_list_unsorted = cubit.parse_cubit_list('node', 'in hex in block '+ '  '.join(str(x) for x in block_list))
         node_list_unsorted = cubit.parse_cubit_list('node', 'all')
         node_list = tuple(sorted(node_list_unsorted))
