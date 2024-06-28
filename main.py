@@ -59,6 +59,26 @@ def volumes(filename=None):
     if cfg.block_firstlayer:
         blockTop()
 
+    if cfg.onlysurface:
+        if cfg.enlarge_boundary:
+            cubit.cmd('set node constraint off')
+            
+            cubit.cmd('group \'left_boundary\' add \
+            Node in edge in group edge_left_boundary')
+            cubit.cmd('node in left_boundary move x -50')
+
+            cubit.cmd('group \'right_boundary\' add \
+            Node in edge in group edge_right_boundary')
+            cubit.cmd('node in right_boundary move x 50')
+
+            cubit.cmd('group \'lower_boundary\' add \
+            Node in edge in group edge_lower_boundary')
+            cubit.cmd('node in lower_boundary move y -50')
+
+            cubit.cmd('group \'upper_boundary\' add \
+            Node in edge in group edge_upper_boundary')
+            cubit.cmd('node in upper_boundary move y 50')
+
     #Save volumes meshed unmerged
     if cfg.onlysurface:
         cubitcommand = 'save as "' + cfg.output_dir + '/' + \
@@ -83,7 +103,7 @@ def volumes(filename=None):
                 cubit.cmd('compress all')
                 # cubitcommand = 'save as "' + cfg.output_dir + '/' + \
                 #      'vol_merged.cub5' + '"  overwrite'
-                # cubit.cmd(cubitcommand) 
+                # cubit.cmd(cubitcommand)    
 
     #Curve refinement
     if cfg.curve_refinement:
@@ -262,8 +282,20 @@ def layercake_from_ascii_regulargrid(filename=None,
             #
             nxmin_cpu = (nx_segment - 1) * (icpux)
             nymin_cpu = (ny_segment - 1) * (icpuy)
-            nxmax_cpu = min(nx - 1, (nx_segment - 1) * (icpux + 1))
-            nymax_cpu = min(ny - 1, (ny_segment - 1) * (icpuy + 1))
+            if ixpro == cfg.end_chunk_xi -1:
+                if cfg.end_chunk_xi == cfg.nproc_xi:
+                    nxmax_cpu = nx - 1
+                else:
+                    nxmax_cpu = min(nx - 1, (nx_segment - 1) * (icpux + 1))
+            else:
+                nxmax_cpu = (nx_segment - 1) * (icpux + 1)
+            if iypro == cfg.end_chunk_eta -1:
+                if cfg.end_chunk_eta == cfg.nproc_eta:
+                    nymax_cpu = ny - 1
+                else:
+                    nymax_cpu = min(ny - 1, (ny_segment - 1) * (icpuy + 1))
+            else:
+                nymax_cpu = (ny_segment - 1) * (icpuy + 1)
 
             isurf = 0
             isurfaces = []
@@ -1041,9 +1073,16 @@ def definesurface_blocks(nx_segment,ny_segment,lprevious,filename):
         nx=cfg.nx
 
     xmin_box = cfg.xmin+(nx_segment-1)*(cfg.start_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1)
-    xmax_box = cfg.xmin+(nx_segment-1)*(cfg.end_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1)
     ymin_box = cfg.ymin+(ny_segment-1)*(cfg.start_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
-    ymax_box = cfg.ymin+(ny_segment-1)*(cfg.end_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
+
+    if cfg.end_chunk_xi == cfg.nproc_xi:
+        xmax_box=cfg.xmax
+    else:
+        xmax_box = cfg.xmin+(nx_segment-1)*(cfg.end_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1)
+    if cfg.end_chunk_eta == cfg.nproc_eta:
+        ymax_box=cfg.ymax
+    else:
+        ymax_box = cfg.ymin+(ny_segment-1)*(cfg.end_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
     
     tol=2
 
@@ -1059,10 +1098,15 @@ def definesurface_blocks(nx_segment,ny_segment,lprevious,filename):
     for iv in list_curve_or:
         pv = cubit.get_center_point("curve", iv)
         x_rotated,y_rotated = DoRotation(cfg.xmin,cfg.ymin,numpy.array([pv[0]]), numpy.array([pv[1]]), -1*cfg.rot_deg)
-        if xmin_box-tol < x_rotated < xmin_box+tol or xmax_box-tol < x_rotated < xmax_box+tol :
-            pass
-        elif ymin_box-tol < y_rotated < ymin_box+tol or ymax_box-tol < y_rotated < ymax_box+tol :
-            pass
+        
+        if xmin_box-tol < x_rotated < xmin_box+tol:
+            cubit.cmd("group 'edge_left_boundary' add edge in curve " + str(iv))
+        elif xmax_box-tol < x_rotated < xmax_box+tol:
+            cubit.cmd("group 'edge_right_boundary' add edge in curve " + str(iv))
+        elif ymin_box-tol < y_rotated < ymin_box+tol:
+            cubit.cmd("group 'edge_lower_boundary' add edge in curve " + str(iv))
+        elif ymax_box-tol < y_rotated < ymax_box+tol:
+            cubit.cmd("group 'edge_upper_boundary' add edge in curve " + str(iv))
         else:
                 # command = "block 200 add edge in curve " + str(iv)
                 # cubit.cmd(command)
@@ -1085,9 +1129,16 @@ def define_blocks(nx_segment,ny_segment,lprevious,filename):
 
     zmin_box = cfg.depth_bottom
     xmin_box = cfg.xmin+(nx_segment-1)*(cfg.start_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1)
-    xmax_box = min(cfg.xmin+(nx_segment-1)*(cfg.end_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1),cfg.xmax)
-    ymin_box = cfg.ymin+(ny_segment-1)*(cfg.start_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
-    ymax_box = min(cfg.ymin+(ny_segment-1)*(cfg.end_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1),cfg.ymax)
+    ymin_box = cfg.ymin+(ny_segment-1)*(cfg.start_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)     
+
+    if cfg.end_chunk_xi == cfg.nproc_xi:
+        xmax_box=cfg.xmax
+    else:
+        xmax_box = cfg.xmin+(nx_segment-1)*(cfg.end_chunk_xi)*(cfg.xmax-cfg.xmin)/(nx-1)
+    if cfg.end_chunk_eta == cfg.nproc_eta:
+        ymax_box=cfg.ymax
+    else:
+        ymax_box = cfg.ymin+(ny_segment-1)*(cfg.end_chunk_eta)*(cfg.ymax-cfg.ymin)/(ny-1)
 
     tol=2
     

@@ -179,6 +179,7 @@ def readcfg(filename=None, mpiflag=False):
     dcfg['num_curve_refinement'] = 1
     dcfg['disassociate'] = False
     dcfg['block_firstlayer'] = False
+    dcfg['enlarge_boundary'] = False
     dcfg['subduction_thres'] = 500
     # if true it creates only the surface not the lofted volumes
     dcfg['debugsurface'] = False
