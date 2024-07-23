@@ -209,7 +209,7 @@ def export_LS(block=1,istart=1,filename=None):
 
     for node in node_list:
         x, y, z = cubit.get_nodal_coordinates(node)
-        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (istart, x, y, z)
+        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (istart, x, y, z+10)
         LSfile.write(txt)
         istart = istart + 1
 
