@@ -73,7 +73,7 @@ def cubit_command_check(iproc, command, stop=True):
         flag = False
     return flag
 
-def export_mesh(block_list,filename=None):
+def export_mesh(block_list,planeWave=None,filename=None):
 
     if filename:
         import start
@@ -120,6 +120,15 @@ def export_mesh(block_list,filename=None):
             txt = txt + '\n'
             meshfile.write(txt)
             idf=idf+1
+        if planeWave:
+            face_list_unsorted2 = cubit.get_block_faces(101)
+            face_list2 = tuple(sorted(face_list_unsorted2))
+            for face in face_list2:
+                nodesf= cubit.get_connectivity('face', face)
+                txt = str(idf) + '  101  quad  ' + '  '.join(str(x) for x in nodesf)
+                txt = txt + '\n'
+                meshfile.write(txt)
+                idf=idf+1
         
         idh=1
 
@@ -144,6 +153,7 @@ def export_mesh(block_list,filename=None):
         meshfile.close()
     else:
         print('Block 100 (ABS) is empty or missing. This block should include the faces of the ABS')
+
     
 
 def export_surfacemesh(bl=1,filename=None):
