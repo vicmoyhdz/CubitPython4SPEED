@@ -187,6 +187,24 @@ def export_surfacemesh(bl=1,filename=None):
 
     meshfile.close()
 
+def separateABC(z_bottom,bl=100):
+
+    cubit.cmd('set duplicate block elements on')
+    face_list_unsorted = cubit.get_block_faces(bl)
+    face_list = tuple(sorted(face_list_unsorted))
+        
+    lateral_faces=[]
+    for face in face_list:
+        loc_center= cubit.get_center_point('face', face)
+        if loc_center[2]>z_bottom:
+            lateral_faces.append(face)
+             
+    command = "block 101 add face " + ' '.join(str(x) for x in lateral_faces)
+    cubit.cmd(command)
+    command = "block 100 remove face " + ' '.join(str(x) for x in lateral_faces)
+    cubit.cmd(command)
+
+
 def export_LS(block=1,istart=1,filename=None):
 
     print('exporting LS surface file...')
@@ -209,7 +227,7 @@ def export_LS(block=1,istart=1,filename=None):
 
     for node in node_list:
         x, y, z = cubit.get_nodal_coordinates(node)
-        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (istart, x, y, z+10)
+        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (istart, x, y, z+20)
         LSfile.write(txt)
         istart = istart + 1
 
