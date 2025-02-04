@@ -73,67 +73,58 @@ def cubit_command_check(iproc, command, stop=True):
         flag = False
     return flag
 
-def export_mesh(block_list,planeWave=None,filename=None):
+def export_mesh(block_list,quad_list=[100],filename=None):
 
     if filename:
         import start
         cfg = start.start_cfg(filename=filename)
 
     cubit.cmd('compress all')
-    face_list_unsorted = cubit.get_block_faces(100)
-
-    if len(face_list_unsorted)>0:
-
-        face_list = tuple(sorted(face_list_unsorted))
-        num_faces=len(face_list_unsorted)
-
-        print('exporting SPEED mesh file...')  
-        #node_list_unsorted = cubit.parse_cubit_list('node', 'in hex in block '+ '  '.join(str(x) for x in block_list))
-        node_list_unsorted = cubit.parse_cubit_list('node', 'all')
-        node_list = tuple(sorted(node_list_unsorted))
-        num_nodes = len(node_list)
-        print(' total number of nodes:', str(num_nodes))
-        num_elems = 0
-        for iblock in block_list:
+    
+    print('exporting SPEED mesh file...')  
+    
+    node_list_unsorted = cubit.parse_cubit_list('node', 'all')
+    node_list = tuple(sorted(node_list_unsorted))
+    num_nodes = len(node_list)
+    print(' total number of nodes:', str(num_nodes))
+    num_faces = 0
+    for iquad in quad_list:
+            num_faces=num_faces + len(cubit.get_block_faces(iquad))
+    num_elems = 0
+    for iblock in block_list:
             num_elems=num_elems + len(cubit.get_block_hexes(iblock))
 
-        print(' total number of elements:', str(num_elems+num_faces))
+    print(' total number of elements:', str(num_elems+num_faces))
 
-        if filename:
+    if filename:
             meshfile = open(cfg.output_dir + '\Meshfile.mesh', 'w')
-        else:
+    else:
             meshfile = open('Meshfile.mesh', 'w')
         
-        txt = ('   %i  %i  %i   %i   %i\n') % (num_nodes, num_elems+num_faces, 0, 0, 0)
-        meshfile.write(txt)
+    txt = ('   %i  %i  %i   %i   %i\n') % (num_nodes, num_elems+num_faces, 0, 0, 0)
+    meshfile.write(txt)
 
-        for node in node_list:
+    for node in node_list:
             x, y, z = cubit.get_nodal_coordinates(node)
             txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (node, x, y, z)
             meshfile.write(txt)
 
-        idf = 1
-            
+    idf = 1
+    
+    for iquad in quad_list:
+        face_list_unsorted=cubit.get_block_faces(iquad)
+        face_list = tuple(sorted(face_list_unsorted))
+                  
         for face in face_list:
             nodesf= cubit.get_connectivity('face', face)
-            txt = str(idf) + '  100  quad  ' + '  '.join(str(x) for x in nodesf)
+            txt = str(idf) + '  '  + str(iquad) + '  quad  ' + '  '.join(str(x) for x in nodesf)
             txt = txt + '\n'
             meshfile.write(txt)
             idf=idf+1
-        if planeWave:
-            face_list_unsorted2 = cubit.get_block_faces(101)
-            face_list2 = tuple(sorted(face_list_unsorted2))
-            for face in face_list2:
-                nodesf= cubit.get_connectivity('face', face)
-                txt = str(idf) + '  101  quad  ' + '  '.join(str(x) for x in nodesf)
-                txt = txt + '\n'
-                meshfile.write(txt)
-                idf=idf+1
         
-        idh=1
-
-        hex_quality = []
-        for block in block_list:
+    idh=1
+    hex_quality = []
+    for block in block_list:
             hex_list_unsorted = cubit.get_block_hexes(block)
             hex_list = tuple(sorted(hex_list_unsorted))
   
@@ -144,15 +135,14 @@ def export_mesh(block_list,planeWave=None,filename=None):
                 txt = txt + '\n'
                 meshfile.write(txt)
                 idh=idh+1
-        sj = [x for x in hex_quality if x <= 0.2]
-        sj1 = [x for x in hex_quality if x <= 0.1]
-        print('Minimum scaled jacobian is ', str(min(hex_quality)))
-        if len(sj)>0:  
+    sj = [x for x in hex_quality if x <= 0.2]
+    sj1 = [x for x in hex_quality if x <= 0.1]
+    print('Minimum scaled jacobian is ', str(min(hex_quality)))
+    if len(sj)>0:  
             print('Warning: ',str(round(100*len(sj)/len(hex_quality),1)),'% of elements (',str(len(sj)),') have scaled jacobian (sj) <0.2, from which ',str(len(sj1)),' elements have sj<0.1')       
 
-        meshfile.close()
-    else:
-        print('Block 100 (ABS) is empty or missing. This block should include the faces of the ABS')
+    meshfile.close()
+
 
     
 
@@ -237,7 +227,7 @@ def export_LS(block=1,istart=1,filename=None):
 
     for node in node_list:
         x, y, z = cubit.get_nodal_coordinates(node)
-        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (istart, x, y, z+20)
+        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (istart, x, y, z+15)
         LSfile.write(txt)
         istart = istart + 1
 
@@ -262,6 +252,39 @@ def DoRotation(xmin,ymin,x1, y1, RotDeg=0):
     x=a[0]
     y=a[1]
     return x,y
+
+def BlockBoundary(blockabsorbing=100,blockapply=[1],thick_cushion=1):
+    quads_in_surf = cubit.get_block_faces(blockabsorbing)
+    list_all_hex = cubit.parse_cubit_list('hex', 'in block ' + ' '.join(str(x) for x in blockapply))
+    Nhex = len(list_all_hex)
+    s = set(quads_in_surf)
+    listTop=[]
+    for h in list_all_hex:
+        faces = cubit.get_sub_elements('hex', h, 2)
+        for f in faces:
+            if f in s:
+                    listTop.append(h)
+    for ih in blockapply:
+        command = "block " + str(ih) + " remove hex " + ' '.join(str(x) for x in listTop)
+        cubit.cmd(command)
+    command = "block 8 add hex " + ' '.join(str(x) for x in listTop)
+    cubit.cmd(command)
+
+    for i in range(thick_cushion-1):
+        cubit.cmd('group \'boundaryhex\' add node in hex in block 8')
+        groupb = cubit.get_id_from_name("boundaryhex")
+        nodesb = list(cubit.get_group_nodes(groupb))
+        hexesl=[]
+        for inodes in nodesb:
+                nh = cubit.parse_cubit_list('hex', 'in node ' + str(inodes))
+                hexesadd = list(nh)
+                hexesl.append(hexesadd)
+        for ih in blockapply:
+            command = "block " + str(ih) + " remove hex " + ' '.join(str(x) for x in hexesl)
+            cubit.cmd(command)
+        command = "block 8 add hex " + ' '.join(str(x) for x in hexesl)
+        cubit.cmd(command)
+
 
 def load_curves(acis_filename):
     """
