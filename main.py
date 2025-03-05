@@ -264,7 +264,7 @@ def layercake_from_ascii_regulargrid(filename=None,
                 coordy[ix, iy] = cfg.ymin + ylength * (iy)
         
         from utilities import DoRotation
-        coordx,coordy = DoRotation(cfg.xmin,cfg.ymin,coordx, coordy, -1*cfg.rot_deg)
+        coordx,coordy = DoRotation(cfg.xmin,cfg.ymin,coordx, coordy, cfg.rot_deg)
 
     #
     print('end of building grid ' + str(ipro))
