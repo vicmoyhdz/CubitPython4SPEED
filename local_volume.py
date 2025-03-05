@@ -195,7 +195,6 @@ def read_grid(filename=None,ipro=0):
     numpy = start.start_numpy()
     cfg = start.start_cfg(filename=filename)
     RotAng = cfg.rot_deg
-    print('Degrees',RotAng)
 
     # if cfg.sample_grid==True then cfg.nx and cfg.ny are the
     # desired number of point along the axis....
@@ -273,12 +272,4 @@ def read_grid(filename=None,ipro=0):
                     cfg.lat_orientation)
             elev[:, :, inz] = elev_1[:, :]
 
-        if cfg.subduction:
-            print('subduction')
-            top = elev[:, :, inz]
-            slab = elev[:, :, inz - 1]
-            subcrit = numpy.abs(top - slab) < cfg.subduction_thres
-            top[subcrit] = slab[subcrit] + cfg.subduction_thres
-            print(len(top[subcrit]))
-            elev[:, :, inz] = top
     return coordx, coordy, elev, nx, ny

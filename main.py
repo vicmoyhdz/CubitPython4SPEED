@@ -65,19 +65,19 @@ def volumes(filename=None):
             
             cubit.cmd('group \'left_boundary\' add \
             Node in edge in group edge_left_boundary')
-            cubit.cmd('node in left_boundary move x -50')
+            cubit.cmd('node in left_boundary move x -5')
 
             cubit.cmd('group \'right_boundary\' add \
             Node in edge in group edge_right_boundary')
-            cubit.cmd('node in right_boundary move x 50')
+            cubit.cmd('node in right_boundary move x 5')
 
             cubit.cmd('group \'lower_boundary\' add \
             Node in edge in group edge_lower_boundary')
-            cubit.cmd('node in lower_boundary move y -50')
+            cubit.cmd('node in lower_boundary move y -5')
 
             cubit.cmd('group \'upper_boundary\' add \
             Node in edge in group edge_upper_boundary')
-            cubit.cmd('node in upper_boundary move y 50')
+            cubit.cmd('node in upper_boundary move y 5')
 
     #Save volumes meshed unmerged
     if cfg.onlysurface:
@@ -130,7 +130,7 @@ def volumes(filename=None):
             block_list_unsorted=block_listt[:-2]
             block_list = tuple(sorted(block_list_unsorted))
             from utilities import export_mesh
-            export_mesh(block_list,filename)
+            export_mesh(block_list,[100],filename)
     #Export LS
     if cfg.export_ls:
         if cfg.onlysurface:
@@ -262,6 +262,9 @@ def layercake_from_ascii_regulargrid(filename=None,
                 icoord = icoord + 1
                 coordx[ix, iy] = cfg.xmin + xlength * (ix)
                 coordy[ix, iy] = cfg.ymin + ylength * (iy)
+        
+        from utilities import DoRotation
+        coordx,coordy = DoRotation(cfg.xmin,cfg.ymin,coordx, coordy, -1*cfg.rot_deg)
 
     #
     print('end of building grid ' + str(ipro))
@@ -1254,7 +1257,8 @@ def define_top(filename,ltprevious,block):
                 command = "block " + str(block) + " add face in surface " + str(iht)
                 cubit.cmd(command)
         else:
-            pass                   
+            pass     
+
 
 def hor_distance(c1, c2):
     p1 = cubit.get_center_point("curve", c1)
