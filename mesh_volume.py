@@ -117,7 +117,8 @@ def meshsurface_layercake_regularmap(filename,iproc,lprevious):
 
     ucurve, vcurve = get_uv_curve(list_curve_or,filename)
     schemepave = False
-    #
+
+    #interval = int(round(length / cfg.size))*3**(cfg.ntripl)
 
     ucurve_interval = {}
     for k in ucurve:
@@ -152,12 +153,17 @@ def meshsurface_layercake_regularmap(filename,iproc,lprevious):
         command = "curve " + str(k) + " scheme equal"
         cubit.cmd(command)
         # cubit_error_stop(iproc,command,ner)
-    #
+    
 
     print('meshing...')
 
     command = "mesh surface " + str(list_sur[0])
     status = cubit_command_check(iproc, command, stop=False)
+
+    # if cfg.ntripl != 0:
+    #     cubitcommand = 'refine node in surf  ' + \
+    #                 str(list_sur[0]) + ' numsplit '+ str(cfg.ntripl) +' bias 1.0'
+    #     cubit.cmd(cubitcommand)
     
     command='QTri surface ' + str(list_sur[0])
     cubit.cmd(command)
@@ -228,13 +234,12 @@ def mesh_layercake_regularmap(filename,iproc,lprevious):
         length=round(length_r)
         interval = int(round(length / cfg.size))
         ucurve_interval[k] = interval
-    # print('u intervals',ucurve_interval.values())
+    #if lprevious==1:
     intervalu=min(ucurve_interval.values())   
-    # print(intervalu)
+       # print('First surface')
     for k in ucurve:
         command = "curve " + str(k) + " interval " + str(intervalu)
         cubit.cmd(command)
-        # cubit_error_stop(iproc,command,ner)
         command = "curve " + str(k) + " scheme equal"
         cubit.cmd(command)
         # cubit_error_stop(iproc,command,ner)
@@ -245,9 +250,7 @@ def mesh_layercake_regularmap(filename,iproc,lprevious):
         length=round(length_r)
         interval = int(round(length / cfg.size))
         vcurve_interval[k] = interval
-    # print('v intervals',vcurve_interval.values())
-    intervalv=min(vcurve_interval.values())  
-    # print(intervalv)  
+    intervalv=min(vcurve_interval.values())   
     for k in vcurve:
         command = "curve " + str(k) + " interval " + str(intervalv)
         cubit.cmd(command)
@@ -475,7 +478,7 @@ def refinement(nvol, vol, filename=None):
                     # refinement on the top surface
                     _, _, _, _, _, tsurf = get_v_h_list([vol[ir - 2].ID])
                     tsurf = ' '.join(str(x) for x in tsurf)
-                    idepth = 1
+                    idepth = cfg.refinement_depth_top
                     cubitcommand = 'refine node in surf ' + str(tsurf) + \
                     ' numsplit '+ str(cfg.nsplit) +' bias 1.0 depth ' + str(idepth)
                 cubit.cmd(cubitcommand)
@@ -487,7 +490,6 @@ def refinement(nvol, vol, filename=None):
             # surfaces from the left
         cubitcommand = "refine node in volume 2 numsplit 1 depth 0"
         cubit.cmd(cubitcommand)
-        # END AAA
 
 
 def pinpoly(x, y, polyx, polyy):

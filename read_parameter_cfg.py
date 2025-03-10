@@ -146,6 +146,7 @@ def readcfg(filename=None, mpiflag=False):
     dcfg['nstep'] = False
     dcfg['localdir_is_globaldir'] = True
     dcfg['refinement_depth'] = []
+    dcfg['refinement_depth_top'] = 1
     dcfg['scratchdir'] = None
     dcfg['map_meshing_type'] = 'regularmap'
     dcfg['4sideparallel'] = True
