@@ -1,7 +1,8 @@
 #############################################################################
 # read_parameter_cfg.py                                                     #
-# Modified by Victor Hernandez from GEOCUBIT (Emanuele Casarotti)           #                                              #
-# Copyright (c) 2008 Istituto Nazionale di Geofisica e Vulcanologia         #
+# By Victor Hernandez (victorh@hi.is)                                       #
+# University of Iceland and Politecnico di Milano                           #
+# Inspired from GEOCUBIT (Emanuele Casarotti, INGV)                         #
 #                                                                           #
 #############################################################################
 #                                                                           #
