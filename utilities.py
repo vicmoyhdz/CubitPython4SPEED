@@ -1,7 +1,7 @@
 #############################################################################
 # utilities.py                                                              #
-# Modified by Victor Hernandez from GEOCUBIT (Emanuele Casarotti)           #                                             #
-# Copyright (c) 2008 Istituto Nazionale di Geofisica e Vulcanologia         #
+# By Victor Hernandez (victorh@hi.is)                                       #
+# University of Iceland and Politecnico di Milano                           #
 #                                                                           #
 #############################################################################
 #                                                                           #
@@ -143,9 +143,6 @@ def export_mesh(block_list,quad_list=[100],filename=None):
 
     meshfile.close()
 
-
-    
-
 def export_surfacemesh(bl=1,filename=None):
 
     if filename:
@@ -227,7 +224,7 @@ def export_LS(block=1,istart=1,filename=None):
 
     for node in node_list:
         x, y, z = cubit.get_nodal_coordinates(node)
-        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (istart, x, y, z+15)
+        txt = ('%i  %+0.7e  %+0.7e  %+0.7e\n') % (istart, x, y, z+20)
         LSfile.write(txt)
         istart = istart + 1
 
@@ -480,3 +477,349 @@ def highlight(ent, l):
     txt = list2str(l)
     txt = 'highlight ' + ent + ' ' + txt
     cubit.cmd(txt)
+    
+###################################
+
+def DRM_ALL(block_inp,box_1,z_1,box_2,z_2):
+    
+    DRM(block_inp,box_1,z_1)  
+    #removing block 90
+    cubit.cmd("delete block 90")
+    lv=cubit.parse_cubit_list("hex","with not block_assigned")
+    command = "block 1 add hex " + ' '.join(str(x) for x in lv)
+    cubit.cmd(command)
+    
+    interface_block(91,block_inp,92)
+    DRM(91,box_2,z_2,93,94)
+    interface_block(94,93,95)       
+
+def DRM(block_inp,box_xy,z_base,block_id_boundary=90,block_id_inside=91,
+        alpha=0.95, beta=0.95,corner_gamma=0.95, tol_base=0.95, per_z_layer=True):
+    
+        # ===================== inputs =====================
+    # block_inp = block where the box is embedded (it could be extended to take more than 1 block)
+    #box_xy = [(-10,-10),(10,-10),(10,10),(-10,10)]   # CLOSED polygon vertices (no repeat at end)
+    #z_base = coordinate z of the base of the box
+    #the strip of elements (edge) with width equal to 1 element,
+    # closest to the box defined by box_xy and z_base are selected
+    #block_id_boundary = number of output block with the "edge"
+    #block_id_inside = number of output block with hexes inside the box
+    
+    #beta   = 1.0   # along-edge stride ~ beta * local h_xy
+    #per_z_layer = True -> keep one element per edge and per depth layer
+    # =================================================
+
+    from collections import namedtuple, Counter
+    Candidate = namedtuple("Candidate", "eid s d hxy z seg_i")
+    
+    Lcum = precompute_edges(box_xy) #creates polygon from box_xy
+    nvert = len(box_xy)
+
+    #extracts all elements from input block
+    all_elems_unsorted = cubit.get_block_hexes(block_inp) 
+    all_elems = tuple(sorted(all_elems_unsorted))
+        
+    elems=[] #takes only hexes above the coordinate z_base (to reduce calculations)
+    for hex in all_elems:
+        #loc_center has coordinates x,y,z of the center of each hex
+        loc_center= cubit.get_center_point('hex', hex)
+        if loc_center[2]>=z_base-1e-9:
+            elems.append(hex)
+    
+    sample = elems[:min(200, len(elems))]
+    hz = estimate_hz_from_nodes(sample)   # estimates median height of elements from 200 hexes
+    
+    # polygon bbox for quick reject
+    minx = min(p[0] for p in box_xy); maxx = max(p[0] for p in box_xy)
+    miny = min(p[1] for p in box_xy); maxy = max(p[1] for p in box_xy)
+
+    seg_buckets = {}      # (seg_i, zlayer) -> list[Candidate]
+    corner_buckets = {}   # (vtx_i, zlayer) -> list[Candidate]
+    inside_cache = []     # (eid, x, y, z, hxy)
+
+    # Gather edge candidates + cache all inside elements
+    for eid in elems: #loop over the hexes
+        x,y,z = cubit.get_center_point("hex",eid)
+        if x < minx-1e-9 or x > maxx+1e-9 or y < miny-1e-9 or y > maxy+1e-9:
+            continue # skip if outside the limits of the box + tolerance
+        if not point_in_poly(x, y, box_xy, include_boundary=True):
+            continue #verify that the center of the hex is inside the polygon
+
+        hxy = hxy_bbox(eid) #gets minimum edge size of the hex
+        inside_cache.append((eid, x, y, z, hxy)) #gathers elements inside the polygon
+
+        #nearest edge of the box to the centroid of the hex
+        d, s, seg_i, t = nearest_edge_raw(x, y, box_xy, Lcum)
+        if d > (alpha * hxy): #defines if the hex (centroid) is located at less that 1 element distance to the edge
+            continue  # skip: not in the first ring next to the edge
+        
+        zk = 0 if not per_z_layer else int(round(z / max(1e-9, hz)))
+        
+        # absolute corner band ~ corner_gamma * hxy. Here we define if the hex is at a corner
+        edge_s0 = Lcum[seg_i]; edge_s1 = Lcum[seg_i+1]
+        dist_to_end = min(s - edge_s0, edge_s1 - s)
+        is_corner = dist_to_end <= (corner_gamma * hxy)
+        vtx_i = seg_i if (s - edge_s0) <= (edge_s1 - s) else (seg_i + 1) % nvert
+
+        cand = Candidate(eid=eid, s=s, d=d, hxy=hxy, z=z, seg_i=seg_i)
+        #separates hexes in corners or along edges
+        if is_corner:
+            corner_buckets.setdefault((vtx_i, zk), []).append(cand)
+        else:
+            seg_buckets.setdefault((seg_i, zk), []).append(cand)
+
+    # Edge keep (greedy per segment + one per corner)
+    kept_edge = []
+    for key, lst in seg_buckets.items():
+        lst.sort(key=lambda c: (c.s, c.d))
+        i = 0
+        while i < len(lst):
+            best = lst[i]
+            j = i + 1
+            s_next = best.s + beta * best.hxy
+            while j < len(lst) and lst[j].s < s_next:
+                if lst[j].d < best.d:
+                    best = lst[j]
+                    s_next = best.s + beta * best.hxy
+                j += 1
+            kept_edge.append(best)
+            i = j
+    for key, lst in corner_buckets.items():
+        kept_edge.append(min(lst, key=lambda c: c.d))
+
+    side_ids = {c.eid for c in kept_edge}
+
+    # Selection of hexes at the base:
+    base_ids = set()
+
+    z_base_eff = float(z_base)
+    z_tol_eff = tol_base * hz
+    for (eid, _x, _y, z, _h) in inside_cache:
+        if abs(z - z_base_eff) <= z_tol_eff:
+             base_ids.add(eid)
+    
+    # Inside = all inside elements minus the EDGE set and BASE set
+    inside_ids = {eid for (eid, _x, _y, _z, _h) in inside_cache}
+    inside_ids -= side_ids
+    inside_ids -= base_ids
+    
+    # Make blocks
+    make_block(block_id_boundary, block_inp, side_ids, "TMP_EDGE")
+    make_block(block_id_boundary, block_inp, base_ids, "TMP_EDGE")
+    make_block(block_id_inside, block_inp, inside_ids, "TMP_INSIDE")
+    cubit.cmd("delete group TMP_EDGE")
+    cubit.cmd("delete group TMP_INSIDE")
+   
+   ######################################################### 
+    #Create block with faces between EDGE and INSIDE
+def interface_block(block_id_inside, block_id_boundary,block_face=92):
+        from collections import Counter
+        cubit.cmd('set info off')
+        cubit.cmd('set echo off')
+
+        inside_hex = get_hexes_in_block(block_id_inside)
+        edge_hex   = get_hexes_in_block(block_id_boundary)
+
+        # 1) EDGE face keys (set of 4-corner frozensets)
+        edge_face_keys = set()
+        for eid in edge_hex:
+            for fn in hex_local_faces_hex8(hex_nodes(eid)):
+                edge_face_keys.add(frozenset(fn))
+
+        # 2) INSIDE boundary face keys (count==1 within INSIDE)
+        cnt = Counter()
+        for eid in inside_hex:
+            for fn in hex_local_faces_hex8(hex_nodes(eid)):
+                cnt[frozenset(fn)] += 1
+        inside_boundary = {k for k, c in cnt.items() if c == 1}
+
+        # 3) Interface keys = intersection
+        iface_keys = inside_boundary & edge_face_keys
+        if not iface_keys:
+            raise RuntimeError("No interface faces found (INSIDE and EDGE may not touch).")
+
+        # Consistent ordered 4-tuples for each key (use INSIDE orientation)
+        ordered = {}
+        for eid in inside_hex:
+            n = hex_nodes(eid)
+            for fn in hex_local_faces_hex8(n):
+                k = frozenset(fn)
+                if k in iface_keys and k not in ordered:
+                    ordered[k] = fn
+
+        # 4) Snapshot existing faces ONCE
+        before_faces = set(cubit.parse_cubit_list("face", "all"))
+
+        # 5) Create missing faces (skip ones that already exist)
+        to_create = list(ordered.values())
+        for (n1, n2, n3, n4) in to_create:
+            cubit.cmd(f"create face node {n1} {n2} {n3} {n4}")
+
+        # 6) Map interface keys -> face IDs using only the *new* faces
+        after_faces = set(cubit.parse_cubit_list("face", "all"))
+        new_face_ids = list(after_faces - before_faces)
+        # Build node-sets for new faces
+        new_faces_nodes = [(fid, set(cubit.get_connectivity("face", fid))) for fid in new_face_ids]
+
+        key_to_fid = {}
+        exact_map = {frozenset(nodes): fid for fid, nodes in new_faces_nodes}
+        for k in iface_keys:
+            if k in exact_map:
+                key_to_fid[k] = exact_map[k]
+
+        # If some interface faces already existed before, map them too (superset over *all* faces)
+        '''
+        unresolved = [k for k in iface_keys if k not in key_to_fid]
+        if unresolved:
+            all_faces = list(after_faces)
+            all_faces_nodes = [(fid, set(cubit.get_connectivity("face", fid))) for fid in all_faces]
+            for k in list(unresolved):
+                for fid, nodes in all_faces_nodes:
+                    if k.issubset(nodes):
+                        key_to_fid[k] = fid
+                        break
+        '''
+
+        iface_fids = sorted(key_to_fid.values())
+        if not iface_fids:
+            raise RuntimeError("Could not resolve any interface face IDs.")
+
+        # 7) Build a FACE BLOCK
+        part = " ".join(map(str, iface_fids))
+        cubit.cmd(f"block {block_face} add face {part}")
+        cubit.cmd(f"block {block_face} element type QUAD4")
+
+#------- Helper functions for DRM---------#
+# create blocks for DRM
+def make_block(block_id,block_inp, ids, tmpname):
+        #cubit.cmd(f"group '{tmpname}' delete")
+        step = 5000
+        ids = sorted(ids)
+        for k in range(0, len(ids), step):
+            part = " ".join(map(str, ids[k:k+step]))
+            cubit.cmd(f"group '{tmpname}' add hex {part}")
+        #cubit.cmd(f"block {block_id} delete")
+        ge = cubit.get_id_from_name(tmpname)
+        e1 = cubit.get_group_hexes(ge)
+        command = "block " + str(block_inp) + " remove hex " + ' '.join(str(x) for x in e1)
+        cubit.cmd(command)
+        command = "block " + str(block_id) + " add hex " + ' '.join(str(x) for x in e1)
+        cubit.cmd(command)
+        
+def hex_nodes(eid):
+    return cubit.get_connectivity("hex", eid)
+
+def hex_local_faces_hex8(n):
+    # six faces as 4-corner tuples (HEX8 order)
+    return [
+        (n[0], n[1], n[2], n[3]),
+        (n[4], n[5], n[6], n[7]),
+        (n[0], n[1], n[5], n[4]),
+        (n[1], n[2], n[6], n[5]),
+        (n[2], n[3], n[7], n[6]),
+        (n[3], n[0], n[4], n[7]),
+    ]
+
+def get_hexes_in_block(bid):
+    return list(cubit.parse_cubit_list("hex", f"in block {bid}"))
+
+def build_node_to_faces_index():
+    from collections import defaultdict
+    """node_id -> set(face_ids) for all existing faces"""
+    node2faces = defaultdict(set)
+    all_faces = cubit.parse_cubit_list("face", "all")
+    for fid in all_faces:
+        for nid in cubit.get_connectivity("face", fid):
+            node2faces[nid].add(fid)
+    return node2faces
+
+def find_existing_face_by_four_nodes(node2faces, n1, n2, n3, n4):
+    """Return an existing face id that contains all 4 nodes, or None."""
+    s1 = node2faces.get(n1); s2 = node2faces.get(n2)
+    if not s1 or not s2: return None
+    cand = s1 & s2
+    if not cand: return None
+    s3 = node2faces.get(n3); s4 = node2faces.get(n4)
+    if not s3 or not s4: return None
+    cand &= s3; 
+    if not cand: return None
+    cand &= s4
+    # pick any (should be unique)
+    return next(iter(cand)) if cand else None
+
+# --- geometry helpers ---
+def seg_point_dist2(px, py, x1, y1, x2, y2):
+    vx, vy = x2-x1, y2-y1
+    wx, wy = px-x1, py-y1
+    vv = vx*vx + vy*vy
+    if vv <= 0.0:
+        return (wx*wx + wy*wy), 0.0
+    t = (wx*vx + wy*vy) / vv
+    t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+    dx, dy = (x1 + t*vx) - px, (y1 + t*vy) - py
+    return dx*dx + dy*dy, t
+
+def precompute_edges(poly):
+    import math
+    L = [0.0]
+    for i in range(len(poly)):
+        x1,y1 = poly[i]
+        x2,y2 = poly[(i+1) % len(poly)]
+        L.append(L[-1] + math.hypot(x2-x1, y2-y1))
+    return L
+
+def nearest_edge_raw(px, py, poly, Lcum):
+    import math
+    best = (float("inf"), 0.0, -1, 0.0)  # (d2, s, seg_i, t)
+    for i in range(len(poly)):
+        x1,y1 = poly[i]; x2,y2 = poly[(i+1)%len(poly)]
+        d2, t = seg_point_dist2(px, py, x1,y1, x2,y2)
+        if d2 < best[0]:
+            s = Lcum[i] + t*(Lcum[i+1]-Lcum[i])
+            best = (d2, s, i, t)
+    d2, s, seg_i, t = best
+    return math.sqrt(d2), s, seg_i, t
+
+def hxy_bbox(eid):
+    nids = cubit.get_connectivity("hex", eid)
+    xs, ys = [], []
+    for nid in nids:
+        x,y,_ = cubit.get_nodal_coordinates(nid)
+        xs.append(x); ys.append(y)
+    dx = max(xs)-min(xs); dy = max(ys)-min(ys)
+    return max(1e-9, min(dx, dy))
+
+# defines if the centroid of the hex is inside the poly
+def point_in_poly(px, py, poly, include_boundary=True, eps=1e-12):
+    inside = False
+    n = len(poly)
+    for i in range(n):
+        x1,y1 = poly[i]; x2,y2 = poly[(i+1)%n]
+
+        if include_boundary:
+            cross = (x2 - x1)*(py - y1) - (y2 - y1)*(px - x1)
+            if abs(cross) <= eps * max(1.0, abs(x2 - x1), abs(y2 - y1)):
+                if (min(x1, x2) - eps <= px <= max(x1, x2) + eps and
+                    min(y1, y2) - eps <= py <= max(y1, y2) + eps):
+                    return True
+
+        if ((y1 > py) != (y2 > py)):
+            xints = x1 + (py - y1) * (x2 - x1) / (y2 - y1)
+            if px < xints:
+                inside = not inside
+    return inside
+
+def estimate_hz_from_nodes(eids, min_valid=1e-9):
+    import statistics
+    hz_vals = []
+    for eid in eids:
+        nids = cubit.get_connectivity("hex", eid)
+        zs = [cubit.get_nodal_coordinates(n)[2] for n in nids]
+        hz_e = max(zs) - min(zs)  # element's vertical thickness
+        if hz_e > min_valid:
+            hz_vals.append(hz_e)
+    if not hz_vals:
+        return 1.0
+    return statistics.median(hz_vals)
+
+
